@@ -39,12 +39,9 @@ char **split_string(char *chemin, char *separateur)
 
 int nbchiffres(int nb)
 {
-    int i = (nb == 0) ? 1 : 0;
-    while (nb != 0)
-    {
-        nb /= 10;
+    int i = 1;
+    while ((nb = nb / 10) > 0)
         ++i;
-    }
     return i;
 }
 
