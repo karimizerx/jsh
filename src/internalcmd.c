@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-char *internals[] = {"pwd", "cd", "exit", "?"};
+char *internals[] = {"pwd", "cd", "exit", "?", "kill"};
 
 int exec_pwd()
 {
@@ -93,25 +93,32 @@ int get_signal(char *sig)
 {
     for (int i = 1; i < NSIG; i++)
     {
-        if (i == 32 || i == 33)
-            ;
-        else if (!strcmp(strsignal(i), sig))
-            return i;
+        if (i != 32 && i != 33)
+        {
+            char *abrev = strdup(sigabbrev_np(i));
+            if (!strcmp(abrev, sig + 3))
+            {
+                free(abrev);
+                return i;
+            }
+            free(abrev);
+        }
     }
     return -1;
 }
 
 int exec_kill(command_t *command)
 {
-    if (command->argc != 1 && command->argc != 2)
+    if (command->argc != 2 && command->argc != 3)
     {
         fprintf(stderr, "jsh: kill: bad argument\n");
         return 1;
     }
 
     // Get PID
-    int isjob = (command->argv[command->argc][0] == '%') ? 1 : 0;
-    char *ps = (isjob) ? command->argv[command->argc] + 1 : command->argv[command->argc]; // "PID" or "JOB"
+    int pid_index = command->argc - 1;
+    int isjob = (command->argv[pid_index][0] == '%') ? 1 : 0;
+    char *ps = (isjob) ? command->argv[pid_index] + 1 : command->argv[pid_index]; // "PID" or "JOB"
     char *end;
     int pid = strtol(ps, &end, 10);
     if (*end != '\0')
@@ -122,13 +129,18 @@ int exec_kill(command_t *command)
     pid = (isjob) ? -pid : pid;
 
     // Get SIGNAL
-    char *sig = (command->argc == 1) ? "SIGTERM" : command->argv[1] + 1;
+    char *sig = (command->argc == 2) ? "15" : command->argv[1] + 1;
     char *end2;
 
     int signal = strtol(sig, &end2, 10);
-    if (*end2 == sig)
+    if (end2 == sig)
     {
-        if ((signal = get_signal(sig)) == -1)
+        if (strlen(sig) < 4)
+        {
+            fprintf(stderr, "jsh: kill: bad SIGNAL argument (%s)\n", sig);
+            return 1;
+        }
+        else if ((signal = get_signal(sig)) == -1)
         {
             fprintf(stderr, "jsh: kill: bad SIGNAL argument (%s)\n", sig);
             return 1;
@@ -140,7 +152,7 @@ int exec_kill(command_t *command)
         return 1;
     }
 
-    return (kill(signal, pid) == -1) ? 1 : 0;
+    return -kill(15, pid);
 }
 
 bool is_internal(char *name)
